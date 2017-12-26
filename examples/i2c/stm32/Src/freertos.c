@@ -54,6 +54,7 @@
 /* USER CODE BEGIN Includes */     
 #include "stm32f1xx.h"
 #include "i2c.h"
+#include "app.h"
 /* USER CODE END Includes */
 
 /* Variables -----------------------------------------------------------------*/
@@ -62,17 +63,17 @@ osThreadId i2cHandle;
 
 /* USER CODE BEGIN Variables */
 // iodir
-const int CMD_IODIRA = 0x00;
-const int CMD_IODIRB = 0x01;
+const uint8_t CMD_IODIRA = 0x00;
+const uint8_t CMD_IODIRB = 0x01;
 // outputs
-const int CMD_OLATA = 0x14;
-const int CMD_OLATB = 0x15;
+const uint8_t CMD_OLATA = 0x14;
+const uint8_t CMD_OLATB = 0x15;
 // inputs
-const int CMD_GPIOA = 0x12;
-const int CMD_GPIOB = 0x13;
+const uint8_t CMD_GPIOA = 0x12;
+const uint8_t CMD_GPIOB = 0x13;
 // pull ups
-const int CMD_GPPUA = 0x0c;
-const int CMD_GPPUB = 0x0d;
+const uint8_t CMD_GPPUA = 0x0c;
+const uint8_t CMD_GPPUB = 0x0d;
 
 uint8_t data[2];
 
@@ -144,13 +145,6 @@ void StartDefaultTask(void const * argument)
 void i2cTask(void const * argument)
 {
   /* USER CODE BEGIN i2cTask */
-	  GPIO_InitTypeDef GPIO_InitStruct;
-
-	GPIO_InitStruct.Pin = GPIO_PIN_All;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
 	for(;;) {
 		if(HAL_I2C_Slave_Receive_IT(&hi2c1, data, sizeof(data)) != HAL_OK) {
 			continue;
@@ -158,9 +152,10 @@ void i2cTask(void const * argument)
 
 		ulTaskNotifyTake(i2cHandle, portMAX_DELAY);
 
-		if(data[0] == CMD_GPIOA) {
-			HAL_GPIO_WritePin(GPIOA, data[1], GPIO_PIN_SET);
-			HAL_GPIO_WritePin(GPIOA, ~data[1], GPIO_PIN_RESET);
+		if(data[0] == CMD_GPIOA || data[0] == CMD_GPIOB) {
+			gpio_set(data[0] - CMD_GPIOA, data[1]);
+		} else if(data[0] == CMD_IODIRA || data[0] == CMD_IODIRB) {
+			gpio_setup(data[0] - CMD_IODIRA, data[1]);
 		}
 	}
 
