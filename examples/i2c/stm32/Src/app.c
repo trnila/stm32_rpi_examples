@@ -15,8 +15,8 @@ const Mapping mappings[][WIDE] = {
 		{GPIOA, GPIO_PIN_15},
 		{GPIOA, GPIO_PIN_12},
 		{GPIOA, GPIO_PIN_11},
-		{GPIOA, GPIO_PIN_8},
-		{GPIOB, GPIO_PIN_15}
+		{GPIOB, GPIO_PIN_10},
+		{GPIOB, GPIO_PIN_11}
 	},
 	{
 		{GPIOA, GPIO_PIN_0},
@@ -50,8 +50,6 @@ void gpio_setup(uint8_t bank, uint8_t state) {
 void gpio_set(uint8_t bank, uint8_t state) {
 	assert_param(bank == 0 || bank == 1);
 	const Mapping *mapping = mappings[bank];
-
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_All, GPIO_PIN_SET);
 
 	for(int i = 0; i < WIDE; i++) {
 		GPIO_PinState pinState;
