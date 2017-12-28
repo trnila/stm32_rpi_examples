@@ -1,0 +1,25 @@
+export reset_pin=4
+export boot1_pin=5
+
+export_gpio() {
+	if [ ! -d "/sys/class/gpio/gpio$1" ]; then
+		echo $1 > /sys/class/gpio/export
+	fi
+}
+
+pin_dir() {
+	echo "$2" > /sys/class/gpio/gpio$1/direction
+}
+
+pin_set() {
+	pin_dir "$1" out
+	echo "$2" > /sys/class/gpio/gpio$1/value
+}
+
+reset() {
+	pin_set $reset_pin 0
+	pin_set $reset_pin 1
+}
+
+export_gpio $reset_pin
+export_gpio $boot1_pin

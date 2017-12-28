@@ -1,0 +1,21 @@
+#!/bin/bash
+set -e
+firmware=$1
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+if [ -z "$firmware" ]; then
+	echo "Usage: $(basename "$0") firmware.bin"
+	exit 1
+fi
+
+# shellcheck source=source_ctrl
+source "${DIR}/source_ctrl"
+
+pin_set "$boot1_pin" 1
+reset
+python ~/stm32loader.py -p /dev/ttyAMA0 -e -w "$firmware"
+pin_set "$boot1_pin" 0
+reset
+pin_dir "$reset_pin" in
+pin_dir "$boot1_pin" in
