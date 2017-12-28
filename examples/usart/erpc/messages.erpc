@@ -1,0 +1,17 @@
+enum Direction {
+	Right
+	Left
+}
+
+enum Ctrl {
+    Ctrl_start,
+    Ctrl_pause,
+    Ctrl_restart
+}
+
+interface IO {
+	set_led(uint8 bank, uint8 state) -> uint8
+
+	led_strip(uint32 delay, Direction dir) -> bool
+	led_ctrl(Ctrl ctrl) -> bool
+}
