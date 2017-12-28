@@ -1,2 +1,4 @@
 .settings/
 *.tmp
+build/
+cmake_install.cmake
