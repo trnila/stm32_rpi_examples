@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+    <canvas style="border: 1px solid black" width="600" height="300"></canvas>
+    <script type="text/javascript">
+        const host = document.location.host.split(':')[0];
+        const port = 3000;
+
+        const source = new EventSource("http://" + host + ":" + port);
+        const c = document.querySelector('canvas');
+        const ctx = c.getContext("2d");
+
+        //c.width = window.innerWidth - 30;
+        //c.height = window.innerHeight - 30;
+
+        var prevX = 0;
+        var prevY = 0;
+        source.onmessage = function(event) {
+            var match = /XP=(\d+)\s*XY=(\d+)/g.exec(event.data);
+            var X = 100 - match[1];
+            var Y = match[2];
+
+            if(Y == 22) return;
+
+            var x = Y / 100 * c.width;
+            var y = X / 100 * c.height;
+
+            if(Math.abs(prevX - x) > 50 || Math.abs(prevY - y) > 50) {
+                prevX = x;
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(prevX,prevY);
+            ctx.lineTo(x,y);
+            ctx.stroke();
+            prevX = x;
+            prevY = y;
+        };
+    </script>
+</body>
+</html>
