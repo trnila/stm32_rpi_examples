@@ -9,7 +9,7 @@
   * inserted by the user or by software development tools
   * are owned by their respective copyright owners.
   *
-  * Copyright (c) 2017 STMicroelectronics International N.V. 
+  * Copyright (c) 2018 STMicroelectronics International N.V. 
   * All rights reserved.
   *
   * Redistribution and use in source and binary forms, with or without 
@@ -59,9 +59,30 @@
 /* Variables -----------------------------------------------------------------*/
 osThreadId defaultTaskHandle;
 osThreadId spiHandle;
+osMessageQId commandsHandle;
 
 /* USER CODE BEGIN Variables */
-static uint8_t data[3];
+#define COUNT 4
+
+typedef struct {
+	uint8_t cmd;
+	union {
+		//uint8_t args[COUNT * sizeof(int)];
+		//int iargs[COUNT];
+		uint8_t args[1];
+	};
+} Command;
+
+typedef enum {
+	STATE_START,
+	STATE_READ,
+	STATE_WRITE
+} State;
+
+Command current;
+State state;
+uint8_t number = 18;
+uint8_t nil = 0;
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -71,6 +92,8 @@ void spiTask(void const * argument);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* USER CODE BEGIN FunctionPrototypes */
+
+void start_over();
 
 /* USER CODE END FunctionPrototypes */
 
@@ -108,6 +131,11 @@ void MX_FREERTOS_Init(void) {
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
+  /* Create the queue(s) */
+  /* definition and creation of commands */
+  osMessageQDef(commands, 16, Command);
+  commandsHandle = osMessageCreate(osMessageQ(commands), NULL);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -131,25 +159,56 @@ void StartDefaultTask(void const * argument)
 void spiTask(void const * argument)
 {
   /* USER CODE BEGIN spiTask */
-
-	GPIO_InitTypeDef GPIO_InitStruct;
-	GPIO_InitStruct.Pin = GPIO_PIN_All;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	start_over();
+	Command cmd;
 
 	for(;;) {
-		HAL_SPI_Receive_IT(&hspi2, data, sizeof(data));
-		configASSERT(osThreadSuspend(NULL) == osOK);
+		configASSERT(xQueueReceive(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
 
-		HAL_GPIO_WritePin(GPIOA, data[1], data[2] ? SET : RESET);
+		if(cmd.cmd == 0x10) {
+			number += cmd.args[0];
+		}
 	}
   /* USER CODE END spiTask */
 }
 
 /* USER CODE BEGIN Application */
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
-	configASSERT(osThreadResume(spiHandle) == osOK);
+	asm("bkpt #1");
+}
+
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
+	start_over();
+}
+
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
+	//start_over();
+	asm("bkpt #1");
+}
+
+void start_over() {
+	nil = 0;
+	state = STATE_START;
+	current.cmd = 0;
+	current.args[0] = 0;
+	configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, &current.cmd, 1) == HAL_OK);
+}
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
+	if(state == STATE_START) {
+		if(current.cmd == 0x11) {
+			state = STATE_WRITE;
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &number, &nil, 1) == HAL_OK);
+		} else {
+			state = STATE_READ;
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, current.args, 1) == HAL_OK);
+		}
+	} else if(state == STATE_READ) {
+		configASSERT(xQueueSendFromISR(commandsHandle, &current, NULL) == pdTRUE);
+		start_over();
+	} else {
+		start_over();
+	}
 }
      
 /* USER CODE END Application */
