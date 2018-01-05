@@ -37,7 +37,7 @@
 #include "cmsis_os.h"
 
 /* USER CODE BEGIN 0 */
-
+uint8_t xSwitchRequired; // should we switch current task from irq handler?
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -169,7 +169,8 @@ void SPI1_IRQHandler(void)
   /* USER CODE END SPI1_IRQn 0 */
   HAL_SPI_IRQHandler(&hspi1);
   /* USER CODE BEGIN SPI1_IRQn 1 */
-
+  portEND_SWITCHING_ISR(xSwitchRequired);
+  xSwitchRequired = 0;
   /* USER CODE END SPI1_IRQn 1 */
 }
 

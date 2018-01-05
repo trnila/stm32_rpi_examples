@@ -62,6 +62,8 @@ osThreadId spiHandle;
 osMessageQId commandsHandle;
 
 /* USER CODE BEGIN Variables */
+extern uint8_t xSwitchRequired;
+
 #define COUNT 4
 
 typedef struct {
@@ -204,8 +206,9 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, current.args, 1) == HAL_OK);
 		}
 	} else if(state == STATE_READ) {
-		configASSERT(xQueueSendFromISR(commandsHandle, &current, NULL) == pdTRUE);
+		configASSERT(xQueueSendFromISR(commandsHandle, &current, &xSwitchRequired) == pdTRUE);
 		start_over();
+
 	} else {
 		start_over();
 	}
