@@ -64,7 +64,7 @@ osMessageQId commandsHandle;
 /* USER CODE BEGIN Variables */
 extern uint8_t xSwitchRequired;
 
-#define COUNT 1
+#define MAX_ARGS 4
 
 typedef enum {
 	CMD_READ = 0x10,
@@ -82,11 +82,13 @@ typedef union {
 
 typedef struct {
 	uint8_t cmd;
-	Number args[COUNT];
+	uint8_t argLen;
+	Number args[MAX_ARGS];
 } Command;
 
 typedef enum {
 	STATE_START,
+	STATE_ARGLEN,
 	STATE_READ,
 	STATE_WRITE
 } State;
@@ -94,7 +96,7 @@ typedef enum {
 Command current;
 State state;
 Number number;
-uint8_t nil[COUNT * sizeof(int)];
+uint8_t nil[MAX_ARGS * sizeof(int)];
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -177,26 +179,28 @@ void spiTask(void const * argument)
 	for(;;) {
 		configASSERT(xQueueReceive(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
 
-		switch(cmd.cmd) {
-			case CMD_SET:
-				number.word = cmd.args[0].word;
-				break;
+		for(int i = 0; i < cmd.argLen; i++) {
+			switch (cmd.cmd) {
+				case CMD_SET:
+					number.word = cmd.args[i].word;
+					break;
 
-			case CMD_ADD:
-				number.word += cmd.args[0].word;
-				break;
+				case CMD_ADD:
+					number.word += cmd.args[i].word;
+					break;
 
-			case CMD_SUB:
-				number.word -= cmd.args[0].word;
-				break;
+				case CMD_SUB:
+					number.word -= cmd.args[i].word;
+					break;
 
-			case CMD_AND:
-				number.word &= cmd.args[0].word;
-				break;
+				case CMD_AND:
+					number.word &= cmd.args[i].word;
+					break;
 
-			case CMD_OR:
-				number.word |= cmd.args[0].word;
-				break;
+				case CMD_OR:
+					number.word |= cmd.args[i].word;
+					break;
+			}
 		}
 	}
   /* USER CODE END spiTask */
@@ -218,13 +222,19 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 			state = STATE_WRITE;
 			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, number.bytes, nil, sizeof(number)) == HAL_OK);
 		} else {
-			state = STATE_READ;
-			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, nil, current.args, sizeof(current.args)) == HAL_OK);
+			state = STATE_ARGLEN;
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, nil, &current.argLen, sizeof(current.argLen)) == HAL_OK);
 		}
 	} else if(state == STATE_READ) {
 		configASSERT(xQueueSendFromISR(commandsHandle, &current, &xSwitchRequired) == pdTRUE);
 		start_over();
-
+	} else if(state == STATE_ARGLEN) {
+		state = STATE_READ;
+		if(current.argLen > 0 && current.argLen <= MAX_ARGS) {
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, nil, current.args, sizeof(current.args[0]) * current.argLen) == HAL_OK);
+		} else {
+			start_over();
+		}
 	} else {
 		start_over();
 	}

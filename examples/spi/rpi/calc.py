@@ -1,5 +1,6 @@
 import spidev
 import time
+import itertools
 
 BUS = 0
 DEVICE = 1
@@ -8,8 +9,10 @@ class SPIProtocol:
     def __init__(self, spi):
         self.spi = spi
 
-    def send(self, cmd, data):
-        self.spi.xfer([cmd] + self._encode(data))
+    def send(self, cmd, *args):
+
+        data = list(itertools.chain(*[self._encode(i) for i in args]))
+        self.spi.xfer([cmd, len(args)] + data)
 
     def recv(self, cmd):
         rcv = self.spi.xfer([cmd, 0x00, 0x00, 0x00, 0x00])
@@ -41,17 +44,17 @@ class Calculator(SPIProtocol):
     def set(self, num):
         self.send(self.CMD_SET, num)
 
-    def add(self, num):
-        self.send(self.CMD_ADD, num)
+    def add(self, *args):
+        self.send(self.CMD_ADD, *args)
 
-    def sub(self, num):
-        self.send(self.CMD_SUB, num)
+    def sub(self, *args):
+        self.send(self.CMD_SUB, *args)
 
-    def land(self, num):
-        self.send(self.CMD_AND, num)
+    def land(self, *args):
+        self.send(self.CMD_AND, *args)
 
-    def lor(self, num):
-        self.send(self.CMD_OR, num)
+    def lor(self, *args):
+        self.send(self.CMD_OR, *args)
 
 
 spi = spidev.SpiDev()
@@ -62,8 +65,8 @@ calc = Calculator(spi)
 
 calc.set(100)
 while True:
-    calc.add(5)
+    calc.add(5, 1, 4)
     val = calc.read()
     print(val)
-    time.sleep(0.001)
+    time.sleep(0.1)
 
