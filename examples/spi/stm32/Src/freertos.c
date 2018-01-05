@@ -176,22 +176,13 @@ void spiTask(void const * argument)
 }
 
 /* USER CODE BEGIN Application */
-void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
-	asm("bkpt #1");
+void start_over() {
+	state = STATE_START;
+	configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, &current.cmd, 1) == HAL_OK);
 }
 
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
 	start_over();
-}
-
-void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
-	//start_over();
-	asm("bkpt #1");
-}
-
-void start_over() {
-	state = STATE_START;
-	configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, &current.cmd, 1) == HAL_OK);
 }
 
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
