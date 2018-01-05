@@ -199,11 +199,11 @@ void touchTask(void const * argument)
 #define YM GPIO_PIN_2
 #define XP GPIO_PIN_3
 
-	min[AXIS_Y] = 950;
-	max[AXIS_Y] = 1770;
+	min[AXIS_Y] = 506;
+	max[AXIS_Y] = 3500;
 
-	min[AXIS_X] = 330;
-	max[AXIS_X] = 1400;
+	min[AXIS_X] = 211;
+	max[AXIS_X] = 3500;
 
 	int X, Y;
 	int PX, PY; // precent
@@ -259,7 +259,7 @@ void touchTask(void const * argument)
 		X = current;
 		PX = percent;
 
-		snprintf(data, sizeof(data), "X=%d Y=%d XP=%d XY=%d\r\n", X, Y, PX, PY);
+		snprintf(data, sizeof(data), "X=%d Y=%d XP=%d XY=%d\n\r", X, Y, PX, PY);
 		HAL_UART_Transmit(&huart1, data, strlen(data), HAL_MAX_DELAY);
 	}
   /* USER CODE END touchTask */
