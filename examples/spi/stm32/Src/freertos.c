@@ -66,6 +66,15 @@ extern uint8_t xSwitchRequired;
 
 #define COUNT 1
 
+typedef enum {
+	CMD_READ = 0x10,
+	CMD_SET,
+	CMD_ADD,
+	CMD_SUB,
+	CMD_AND,
+	CMD_OR,
+} CommandType;
+
 typedef union {
 	uint8_t bytes[sizeof(int)];
 	int word;
@@ -168,8 +177,26 @@ void spiTask(void const * argument)
 	for(;;) {
 		configASSERT(xQueueReceive(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
 
-		if(cmd.cmd == 0x10) {
-			number.word += cmd.args[0].word;
+		switch(cmd.cmd) {
+			case CMD_SET:
+				number.word = cmd.args[0].word;
+				break;
+
+			case CMD_ADD:
+				number.word += cmd.args[0].word;
+				break;
+
+			case CMD_SUB:
+				number.word -= cmd.args[0].word;
+				break;
+
+			case CMD_AND:
+				number.word &= cmd.args[0].word;
+				break;
+
+			case CMD_OR:
+				number.word |= cmd.args[0].word;
+				break;
 		}
 	}
   /* USER CODE END spiTask */
@@ -187,7 +214,7 @@ void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
 
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 	if(state == STATE_START) {
-		if(current.cmd == 0x11) {
+		if(current.cmd == CMD_READ) {
 			state = STATE_WRITE;
 			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, number.bytes, nil, sizeof(number)) == HAL_OK);
 		} else {

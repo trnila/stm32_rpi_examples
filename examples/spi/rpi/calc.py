@@ -28,15 +28,30 @@ class SPIProtocol:
 
 
 class Calculator(SPIProtocol):
-    CMD_ADD = 0x10
-    CMD_READ = 0x11
-
-    def add(self, num):
-        self.spi.xfer([self.CMD_ADD] + self._encode(num))
+    CMD_READ = 0x10
+    CMD_SET = 0x11
+    CMD_ADD = 0x12
+    CMD_SUB = 0x13
+    CMD_AND = 0x14
+    CMD_OR = 0x15
 
     def read(self):
         return self.recv(self.CMD_READ)
 
+    def set(self, num):
+        self.send(self.CMD_SET, num)
+
+    def add(self, num):
+        self.send(self.CMD_ADD, num)
+
+    def sub(self, num):
+        self.send(self.CMD_SUB, num)
+
+    def land(self, num):
+        self.send(self.CMD_AND, num)
+
+    def lor(self, num):
+        self.send(self.CMD_OR, num)
 
 
 spi = spidev.SpiDev()
@@ -44,7 +59,11 @@ spi.open(BUS, DEVICE)
 spi.max_speed_hz = 1000
 
 calc = Calculator(spi)
+
+calc.set(100)
 while True:
-    calc.add(1)
-    print(calc.read())
-    time.sleep(0.1)
+    calc.add(5)
+    val = calc.read()
+    print(val)
+    time.sleep(0.001)
+
