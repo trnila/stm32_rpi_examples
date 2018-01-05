@@ -64,15 +64,16 @@ osMessageQId commandsHandle;
 /* USER CODE BEGIN Variables */
 extern uint8_t xSwitchRequired;
 
-#define COUNT 4
+#define COUNT 1
+
+typedef union {
+	uint8_t bytes[sizeof(int)];
+	int word;
+} Number;
 
 typedef struct {
 	uint8_t cmd;
-	union {
-		//uint8_t args[COUNT * sizeof(int)];
-		//int iargs[COUNT];
-		uint8_t args[1];
-	};
+	Number args[COUNT];
 } Command;
 
 typedef enum {
@@ -83,8 +84,8 @@ typedef enum {
 
 Command current;
 State state;
-uint8_t number = 18;
-uint8_t nil = 0;
+Number number;
+uint8_t nil[COUNT * sizeof(int)];
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -168,7 +169,7 @@ void spiTask(void const * argument)
 		configASSERT(xQueueReceive(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
 
 		if(cmd.cmd == 0x10) {
-			number += cmd.args[0];
+			number.word += cmd.args[0].word;
 		}
 	}
   /* USER CODE END spiTask */
@@ -189,10 +190,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
 }
 
 void start_over() {
-	nil = 0;
 	state = STATE_START;
-	current.cmd = 0;
-	current.args[0] = 0;
 	configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, &current.cmd, 1) == HAL_OK);
 }
 
@@ -200,10 +198,10 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 	if(state == STATE_START) {
 		if(current.cmd == 0x11) {
 			state = STATE_WRITE;
-			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &number, &nil, 1) == HAL_OK);
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, number.bytes, nil, sizeof(number)) == HAL_OK);
 		} else {
 			state = STATE_READ;
-			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, current.args, 1) == HAL_OK);
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, nil, current.args, sizeof(current.args)) == HAL_OK);
 		}
 	} else if(state == STATE_READ) {
 		configASSERT(xQueueSendFromISR(commandsHandle, &current, &xSwitchRequired) == pdTRUE);
