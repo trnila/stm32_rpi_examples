@@ -9,7 +9,7 @@
   * inserted by the user or by software development tools
   * are owned by their respective copyright owners.
   *
-  * Copyright (c) 2017 STMicroelectronics International N.V. 
+  * Copyright (c) 2018 STMicroelectronics International N.V. 
   * All rights reserved.
   *
   * Redistribution and use in source and binary forms, with or without 
@@ -59,9 +59,44 @@
 /* Variables -----------------------------------------------------------------*/
 osThreadId defaultTaskHandle;
 osThreadId spiHandle;
+osMessageQId commandsHandle;
 
 /* USER CODE BEGIN Variables */
-static uint8_t data[3];
+extern uint8_t xSwitchRequired;
+
+#define MAX_ARGS 4
+
+typedef enum {
+	CMD_READ = 0x10,
+	CMD_SET,
+	CMD_ADD,
+	CMD_SUB,
+	CMD_AND,
+	CMD_OR,
+} CommandType;
+
+typedef union {
+	uint8_t bytes[sizeof(int)];
+	int word;
+} Number;
+
+typedef struct {
+	uint8_t cmd;
+	uint8_t argLen;
+	Number args[MAX_ARGS];
+} Command;
+
+typedef enum {
+	STATE_START,
+	STATE_ARGLEN,
+	STATE_READ,
+	STATE_WRITE
+} State;
+
+Command current;
+State state;
+Number number;
+uint8_t nil[MAX_ARGS * sizeof(int)];
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -71,6 +106,8 @@ void spiTask(void const * argument);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* USER CODE BEGIN FunctionPrototypes */
+
+void start_over();
 
 /* USER CODE END FunctionPrototypes */
 
@@ -108,6 +145,11 @@ void MX_FREERTOS_Init(void) {
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
 
+  /* Create the queue(s) */
+  /* definition and creation of commands */
+  osMessageQDef(commands, 16, Command);
+  commandsHandle = osMessageCreate(osMessageQ(commands), NULL);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -131,25 +173,71 @@ void StartDefaultTask(void const * argument)
 void spiTask(void const * argument)
 {
   /* USER CODE BEGIN spiTask */
-
-	GPIO_InitTypeDef GPIO_InitStruct;
-	GPIO_InitStruct.Pin = GPIO_PIN_All;
-	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	start_over();
+	Command cmd;
 
 	for(;;) {
-		HAL_SPI_Receive_IT(&hspi2, data, sizeof(data));
-		configASSERT(osThreadSuspend(NULL) == osOK);
+		configASSERT(xQueueReceive(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
 
-		HAL_GPIO_WritePin(GPIOA, data[1], data[2] ? SET : RESET);
+		for(int i = 0; i < cmd.argLen; i++) {
+			switch (cmd.cmd) {
+				case CMD_SET:
+					number.word = cmd.args[i].word;
+					break;
+
+				case CMD_ADD:
+					number.word += cmd.args[i].word;
+					break;
+
+				case CMD_SUB:
+					number.word -= cmd.args[i].word;
+					break;
+
+				case CMD_AND:
+					number.word &= cmd.args[i].word;
+					break;
+
+				case CMD_OR:
+					number.word |= cmd.args[i].word;
+					break;
+			}
+		}
 	}
   /* USER CODE END spiTask */
 }
 
 /* USER CODE BEGIN Application */
-void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
-	configASSERT(osThreadResume(spiHandle) == osOK);
+void start_over() {
+	state = STATE_START;
+	configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, &current.cmd, 1) == HAL_OK);
+}
+
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
+	start_over();
+}
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
+	if(state == STATE_START) {
+		if(current.cmd == CMD_READ) {
+			state = STATE_WRITE;
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, number.bytes, nil, sizeof(number)) == HAL_OK);
+		} else {
+			state = STATE_ARGLEN;
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, nil, &current.argLen, sizeof(current.argLen)) == HAL_OK);
+		}
+	} else if(state == STATE_READ) {
+		configASSERT(xQueueSendFromISR(commandsHandle, &current, &xSwitchRequired) == pdTRUE);
+		start_over();
+	} else if(state == STATE_ARGLEN) {
+		state = STATE_READ;
+		if(current.argLen > 0 && current.argLen <= MAX_ARGS) {
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, nil, current.args, sizeof(current.args[0]) * current.argLen) == HAL_OK);
+		} else {
+			start_over();
+		}
+	} else {
+		start_over();
+	}
 }
      
 /* USER CODE END Application */
