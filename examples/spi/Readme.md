@@ -16,8 +16,8 @@ All other commands are write only. The next byte contains total number of transf
 Command | Name          | Description
 --------| ------------- | ------------------
 0x10    | CMD_READ      | Read current result
-0x11    | CMD_SET       | Set result to value of first argument
-0x12    | CMD_ADD       | Add number from arguments to result
-0x13    | CMD_SUB       | Subtract number from arguments to result
+0x11    | CMD_SET       | Set result to first argument
+0x12    | CMD_ADD       | Add arguments to result
+0x13    | CMD_SUB       | Subtract arguments from result
 0x14    | CMD_AND       | Apply logical *and* over result and all arguments
 0x15    | CMD_OR        | Apply logical *or* over result and all arguments
