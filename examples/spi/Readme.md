@@ -1,5 +1,5 @@
 # SPI calculator
-Rasperry PI is SPI master and sends commands to SPI slave STM32.
+Rasperry PI is SPI master sending commands to SPI slave STM32.
 
 ## Communication
 First byte of each transfer is command byte.
