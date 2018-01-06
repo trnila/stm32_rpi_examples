@@ -1,0 +1,7 @@
+{signal: [
+  {name: 'CLK', wave: 'l.P.......lP.......lP.......lP.......lP.......l'},
+  {name: 'MOSI', wave: 'l2.......0.....................................', data: ['CMD_READ 0x10']},
+  {name: 'MISO', wave: 'l.........4.......04.......04.......04.......0.', data: ['result LSB', 'result', 'result', 'result MSB']},
+  {name: 'CS', wave: 'Hl............................................h'},
+]
+}
