@@ -69,7 +69,7 @@ osThreadId touchHandle;
 #define YM GPIO_PIN_2
 #define XP GPIO_PIN_3
 
-#define SAMPLES_NUM 50
+#define SAMPLES_NUM 10
 
 #define AXIS_Y 0
 #define AXIS_X 1
@@ -166,13 +166,6 @@ int measure(int axis) {
 	return current;
 }
 
-
-int is_touched() {
-	return !(curr[AXIS_Y] > 2000 && curr[AXIS_Y] < 2180 &&
-			curr[AXIS_X] > 2000 && curr[AXIS_X] < 2170);
-
-}
-
 /* USER CODE END FunctionPrototypes */
 
 /* Hook prototypes */
@@ -202,7 +195,7 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of touch */
-  osThreadDef(touch, touchTask, osPriorityIdle, 0, 128);
+  osThreadDef(touch, touchTask, osPriorityIdle, 0, 256);
   touchHandle = osThreadCreate(osThread(touch), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -280,11 +273,35 @@ void touchTask(void const * argument)
 
 		X = measure(AXIS_X);
 
-		snprintf(printBuffer, sizeof(printBuffer), "X=%d Y=%d XP=%d XY=%d\n\r", X, Y, calcPercent(X, AXIS_X), calcPercent(Y, AXIS_Y));
-		HAL_UART_Transmit(&huart1, printBuffer, strlen(printBuffer), HAL_MAX_DELAY);
+
+
+		// Set X+ to ground
+		pinMode(XP, GPIO_MODE_OUTPUT_PP);
+		digitalWrite(XP, GPIO_PIN_RESET);
+
+		// Set Y- to VCC
+		pinMode(YM, GPIO_MODE_OUTPUT_PP);
+		digitalWrite(YM, GPIO_PIN_SET);
+
+		// Hi-Z X- and Y+
+		digitalWrite(XM, GPIO_PIN_RESET);
+		pinMode(XM, GPIO_MODE_ANALOG);
+		digitalWrite(YP, GPIO_PIN_RESET);
+		pinMode(YP, GPIO_MODE_ANALOG);
+
+		int z1 = measure(AXIS_X);
+		int z2 = measure(AXIS_Y);
+		int pressure = z1 + z2;
+
+
+		if(pressure > 0) {
+			snprintf(printBuffer, sizeof(printBuffer), "X=%d Y=%d XP=%d XY=%d %d\n\r", X, Y, calcPercent(X, AXIS_X),
+			         calcPercent(Y, AXIS_Y), pressure);
+			HAL_UART_Transmit(&huart1, printBuffer, strlen(printBuffer), HAL_MAX_DELAY);
+		}
 
 		if(send_irq) {
-			if (is_touched()) {
+			if (pressure > 0) {
 				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
 			} else  {
 				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
