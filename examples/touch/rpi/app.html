@@ -27,6 +27,12 @@
             var x = Y / 100 * c.width;
             var y = X / 100 * c.height;
 
+
+           /* console.log(X, Y);
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, 2 * Math.PI);
+            ctx.stroke();*/
+
 			var t = 20;
             if(Math.abs(prevX - x) > t || Math.abs(prevY - y) > t) {
                 prevX = x;

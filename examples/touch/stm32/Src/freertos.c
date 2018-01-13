@@ -9,7 +9,7 @@
   * inserted by the user or by software development tools
   * are owned by their respective copyright owners.
   *
-  * Copyright (c) 2017 STMicroelectronics International N.V. 
+  * Copyright (c) 2018 STMicroelectronics International N.V. 
   * All rights reserved.
   *
   * Redistribution and use in source and binary forms, with or without 
@@ -55,6 +55,7 @@
 #include "stm32f1xx.h"
 #include "adc.h"
 #include "usart.h"
+#include "spi.h"
 #include <string.h>
 /* USER CODE END Includes */
 
@@ -63,9 +64,19 @@ osThreadId defaultTaskHandle;
 osThreadId touchHandle;
 
 /* USER CODE BEGIN Variables */
+
+typedef enum {
+	STATE_START,
+	STATE_ARGLEN,
+	STATE_READ,
+	STATE_WRITE
+} State;
+
 int val;
 #define size 50
 int vals[size];
+
+int curr[2];
 
 #define AXIS_Y 0
 #define AXIS_X 1
@@ -78,6 +89,14 @@ int current;
 
 char data[50];
 
+State state;
+uint8_t rx[2];
+uint8_t tx[2];
+
+int send_irq = 1;
+
+
+
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -87,6 +106,8 @@ void touchTask(void const * argument);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* USER CODE BEGIN FunctionPrototypes */
+void start_over();
+
 void pinMode(int pin, int mode) {
 	GPIO_InitTypeDef GPIO_InitStruct;
 	GPIO_InitStruct.Pin = pin;
@@ -133,6 +154,15 @@ void measure(int axis) {
 	} else if(percent > 100) {
 		percent = 100;
 	}
+
+	curr[axis] = current;
+}
+
+
+int is_touched() {
+	return !(curr[AXIS_Y] > 2000 && curr[AXIS_Y] < 2180 &&
+			curr[AXIS_X] > 2000 && curr[AXIS_X] < 2170);
+
 }
 
 /* USER CODE END FunctionPrototypes */
@@ -194,6 +224,8 @@ void StartDefaultTask(void const * argument)
 void touchTask(void const * argument)
 {
   /* USER CODE BEGIN touchTask */
+	start_over();
+
 #define YP GPIO_PIN_0
 #define XM GPIO_PIN_1
 #define YM GPIO_PIN_2
@@ -205,8 +237,11 @@ void touchTask(void const * argument)
 	min[AXIS_X] = 211;
 	max[AXIS_X] = 3500;
 
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+
 	int X, Y;
 	int PX, PY; // precent
+	int was_touched = 0;
 	for(;;) {
 		ADC_ChannelConfTypeDef sConfig;
 
@@ -261,12 +296,65 @@ void touchTask(void const * argument)
 
 		snprintf(data, sizeof(data), "X=%d Y=%d XP=%d XY=%d\n\r", X, Y, PX, PY);
 		HAL_UART_Transmit(&huart1, data, strlen(data), HAL_MAX_DELAY);
+
+		if(send_irq) {
+			if (is_touched()) {
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+			} else  {
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+			}
+		}
 	}
   /* USER CODE END touchTask */
 }
 
 /* USER CODE BEGIN Application */
+void start_over() {
+	state = STATE_START;
+	tx[0] = 0;
+	configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 1) == HAL_OK);
+}
 
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
+	start_over();
+}
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
+	if(state == STATE_START) {
+		// start bit missing
+		if(!(rx[0] & (1 << 7))) {
+			start_over();
+		} else {
+
+			uint8_t mode = (rx[0] & 0x70) >> 4;
+			send_irq = (rx[0] & 0x3) == 0;
+
+			tx[0] = tx[1] = 0;
+			if(mode == 0b001) {
+				tx[0] = (curr[AXIS_Y] >> 8) & 0xFFFF;
+				tx[1] = curr[AXIS_Y] & 0xF;
+			} else if(mode == 0b101) {
+				tx[0] = (curr[AXIS_X] >> 8) & 0xFFFF;
+				tx[1] = curr[AXIS_X] & 0xF;
+			} else if(mode == 0b100 || mode == 0b011) {
+				int pressure = 32000;
+
+				tx[0] = (pressure >> 8) & 0xFFFF;
+				tx[1] = pressure & 0xF;
+			} else {
+				// TODO: wat?
+			}
+
+			state = STATE_READ;
+			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 2) == HAL_OK);
+		}
+	} else if(state == STATE_READ) {
+		//configASSERT(xQueueSendFromISR(commandsHandle, &current, &xSwitchRequired) == pdTRUE);
+		start_over();
+	} else {
+		start_over();
+	}
+}
 
 
      
