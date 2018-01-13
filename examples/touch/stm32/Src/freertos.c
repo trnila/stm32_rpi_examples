@@ -88,6 +88,7 @@ typedef enum {
 int samples[SAMPLES_NUM];
 
 int curr[2];
+int pressure[2];
 
 int min[2];
 int max[2];
@@ -283,24 +284,23 @@ void touchTask(void const * argument)
 		digitalWrite(YP, GPIO_PIN_RESET);
 		pinMode(YP, GPIO_MODE_ANALOG);
 
-		int z1 = measure(AXIS_X);
-		int z2 = measure(AXIS_Y);
-		int pressure = z1 + z2;
+		pressure[0] = measure(AXIS_X);
+		pressure[1] = measure(AXIS_Y);
+		int totalPressure = pressure[0] + pressure[1];
 
-
-		if(pressure > 0) {
+		if(totalPressure > 0) {
 			snprintf(printBuffer, sizeof(printBuffer), "X=%d Y=%d XP=%d XY=%d %d\n\r",
 			         curr[AXIS_X],
 			         curr[AXIS_Y],
 			         calcPercent(curr[AXIS_X], AXIS_X),
 			         calcPercent(curr[AXIS_Y], AXIS_Y),
-			         pressure
+			         totalPressure
 			);
 			HAL_UART_Transmit(&huart1, printBuffer, strlen(printBuffer), HAL_MAX_DELAY);
 		}
 
 		if(send_irq) {
-			if (pressure > 0) {
+			if (totalPressure > 0) {
 				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
 			} else  {
 				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
@@ -331,23 +331,21 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 			uint8_t mode = (rx[0] & 0x70) >> 4;
 			send_irq = (rx[0] & 0x3) == 0;
 
+			int val = 0;
 			if(mode == ADS_MEASURE_Y) {
-				int val = curr[AXIS_Y] >> 1;
-
-				tx[0] = (val >> 4) & 0xFF;
-				tx[1] = (val & 0xF) << 4;
+				val = curr[AXIS_Y] >> 1;
 			} else if(mode == ADS_MEASURE_X) {
-				int val = curr[AXIS_X] >> 1;
-				tx[0] = (val >> 4) & 0xFF;
-				tx[1] = (val & 0xF) << 4;
-			} else if(mode == ADS_MEASURE_Z2 || mode == ADS_MEASURE_Z1) {
-				int pressure = 32000;
-
-				tx[0] = (pressure >> 8) & 0xFF;
-				tx[1] = pressure & 0xF;
+				val = curr[AXIS_X] >> 1;
+			} else if(mode == ADS_MEASURE_Z1) {
+				val = pressure[0];
+			} else if(mode == ADS_MEASURE_Z2) {
+				val = pressure[1];
 			} else {
-				// TODO: wat?
+				// TODO: invalid request
 			}
+
+			tx[0] = (val >> 4) & 0xFF;
+			tx[1] = (val & 0xF) << 4;
 
 			state = STATE_READ;
 			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 2) == HAL_OK);
