@@ -64,30 +64,35 @@ osThreadId defaultTaskHandle;
 osThreadId touchHandle;
 
 /* USER CODE BEGIN Variables */
+#define YP GPIO_PIN_0
+#define XM GPIO_PIN_1
+#define YM GPIO_PIN_2
+#define XP GPIO_PIN_3
 
-typedef enum {
-	STATE_START,
-	STATE_ARGLEN,
-	STATE_READ,
-	STATE_WRITE
-} State;
-
-int val;
-#define size 50
-int vals[size];
-
-int curr[2];
+#define SAMPLES_NUM 50
 
 #define AXIS_Y 0
 #define AXIS_X 1
 
+#define ADS_MEASURE_Y 0b001
+#define ADS_MEASURE_X 0b101
+#define ADS_MEASURE_Z1 0b011
+#define ADS_MEASURE_Z2 0b100
+
+
+typedef enum {
+	STATE_START,
+	STATE_READ,
+} State;
+
+int samples[SAMPLES_NUM];
+
+int curr[2];
+
 int min[2];
 int max[2];
 
-int percent;
-int current;
-
-char data[50];
+char printBuffer[50];
 
 State state;
 uint8_t rx[2];
@@ -108,6 +113,17 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 /* USER CODE BEGIN FunctionPrototypes */
 void start_over();
 
+int calcPercent(int current, int axis) {
+	int percent = (((float) current - min[axis]) / (max[axis] - min[axis]) * 100.0);
+	if(percent < 0) {
+		return 0;
+	} else if(percent > 100) {
+		return 100;
+	}
+
+	return percent;
+}
+
 void pinMode(int pin, int mode) {
 	GPIO_InitTypeDef GPIO_InitStruct;
 	GPIO_InitStruct.Pin = pin;
@@ -121,41 +137,33 @@ void digitalWrite(int pin, int state) {
 }
 
 int adcRead() {
-	if(HAL_ADC_Start(&hadc1) != HAL_OK) {
-		for(;;);
-	}
-	if (HAL_ADC_PollForConversion(&hadc1, 1000000) == HAL_OK) {
-		val = HAL_ADC_GetValue(&hadc1);
-		HAL_ADC_Stop(&hadc1);
-		return val;
-	}
-	return 42;
+	configASSERT(HAL_ADC_Start(&hadc1) == HAL_OK);
+	configASSERT(HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) == HAL_OK);
+
+	int val = HAL_ADC_GetValue(&hadc1);
+	HAL_ADC_Stop(&hadc1);
+	return val;
 }
 
-void measure(int axis) {
-	for(int i = 0; i < size; i++) {
-		vals[i] = adcRead();
+int measure(int axis) {
+	for(int i = 0; i < SAMPLES_NUM; i++) {
+		samples[i] = adcRead();
 	}
-	for(int i = 0; i < size; i++) {
-		for(int j = 0; j < size - 1; j++) {
-			if(vals[j] > vals[j + 1]) {
-				int tmp = vals[j];
-				vals[j] = vals[j + 1];
-				vals[j + 1] = tmp;
+	for(int i = 0; i < SAMPLES_NUM; i++) {
+		for(int j = 0; j < SAMPLES_NUM - 1; j++) {
+			if(samples[j] > samples[j + 1]) {
+				int tmp = samples[j];
+				samples[j] = samples[j + 1];
+				samples[j + 1] = tmp;
 			}
 		}
 	}
 
-	current = vals[size / 2];
-
-	percent = (((float) current - min[axis]) / (max[axis] - min[axis]) * 100.0);
-	if(percent < 0) {
-		percent = 0;
-	} else if(percent > 100) {
-		percent = 100;
-	}
+	int current = samples[SAMPLES_NUM / 2];
 
 	curr[axis] = current;
+
+	return current;
 }
 
 
@@ -226,11 +234,6 @@ void touchTask(void const * argument)
   /* USER CODE BEGIN touchTask */
 	start_over();
 
-#define YP GPIO_PIN_0
-#define XM GPIO_PIN_1
-#define YM GPIO_PIN_2
-#define XP GPIO_PIN_3
-
 	min[AXIS_Y] = 506;
 	max[AXIS_Y] = 3500;
 
@@ -240,11 +243,12 @@ void touchTask(void const * argument)
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
 	int X, Y;
-	int PX, PY; // precent
+	// precent
 	int was_touched = 0;
 	for(;;) {
 		ADC_ChannelConfTypeDef sConfig;
 
+		// measure Y
 		pinMode(YP, GPIO_MODE_ANALOG);
 		pinMode(YM, GPIO_MODE_ANALOG);
 		pinMode(XP, GPIO_MODE_OUTPUT_PP);
@@ -253,24 +257,14 @@ void touchTask(void const * argument)
 		sConfig.Channel = ADC_CHANNEL_0;
 		sConfig.Rank = 1;
 		sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
-		if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-		{
-			_Error_Handler(__FILE__, __LINE__);
-		}
+		configASSERT(HAL_ADC_ConfigChannel(&hadc1, &sConfig) == HAL_OK);
 
 		digitalWrite(XP, GPIO_PIN_SET);
 		digitalWrite(XM, GPIO_PIN_RESET);
 
-		osDelay(1);
-
-		measure(AXIS_Y);
-		Y = current;
-		PY = percent;
+		Y = measure(AXIS_Y);
 
 		// ================== X AXIS ================
-
-
-		/**Configure Regular Channel*/
 		pinMode(XP, GPIO_MODE_ANALOG);
 		pinMode(XM, GPIO_MODE_ANALOG);
 		pinMode(YP, GPIO_MODE_OUTPUT_PP);
@@ -279,23 +273,15 @@ void touchTask(void const * argument)
 		sConfig.Channel = ADC_CHANNEL_1;
 		sConfig.Rank = 1;
 		sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
-		if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-		{
-			_Error_Handler(__FILE__, __LINE__);
-		}
-
+		configASSERT(HAL_ADC_ConfigChannel(&hadc1, &sConfig) == HAL_OK);
 
 		digitalWrite(YP, GPIO_PIN_SET);
 		digitalWrite(YM, GPIO_PIN_RESET);
 
-		osDelay(1);
+		X = measure(AXIS_X);
 
-		measure(AXIS_X);
-		X = current;
-		PX = percent;
-
-		snprintf(data, sizeof(data), "X=%d Y=%d XP=%d XY=%d\n\r", X, Y, PX, PY);
-		HAL_UART_Transmit(&huart1, data, strlen(data), HAL_MAX_DELAY);
+		snprintf(printBuffer, sizeof(printBuffer), "X=%d Y=%d XP=%d XY=%d\n\r", X, Y, calcPercent(X, AXIS_X), calcPercent(Y, AXIS_Y));
+		HAL_UART_Transmit(&huart1, printBuffer, strlen(printBuffer), HAL_MAX_DELAY);
 
 		if(send_irq) {
 			if (is_touched()) {
@@ -349,7 +335,6 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 2) == HAL_OK);
 		}
 	} else if(state == STATE_READ) {
-		//configASSERT(xQueueSendFromISR(commandsHandle, &current, &xSwitchRequired) == pdTRUE);
 		start_over();
 	} else {
 		start_over();
