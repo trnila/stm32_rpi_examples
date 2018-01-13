@@ -28,13 +28,25 @@ int calc(int current, Range r) {
 
 int main() {
 	Calibration c;
-	c.x.min = 0;
-	c.x.max = 417;
+	/*
+	c.x.min = 430;
+	c.x.max = 2500;
 
-	c.y.min = 32;
-	c.y.max = 417;
+	c.y.min = 1150;
+	c.y.max = 2950;
+	*/
+
+	c.x.min = 211;
+	c.x.max = 3500;
+
+	c.y.min = 506;
+	c.y.max = 3500;
 
 	int fd = open("/dev/input/event0", O_RDONLY);
+	if(fd < 0) {
+		perror("open");
+		return 1;
+	}
 
 	struct input_event evt;
 
@@ -47,13 +59,11 @@ int main() {
 				Y = evt.value;
 			}
 			//printf("%d %d %d\n", evt.type, evt.code, evt.value);
+		} else if(evt.type == EV_SYN) {
+			printf("X=%d Y=%d XP=%d XY=%d\n", X, Y, calc(X, c.x), calc(Y, c.y));
+			fflush(stdout);
 		}
-
-		printf("X=%d Y=%d XP=%d XY=%d\n", X, Y, calc(X, c.x), calc(Y, c.y));
-		fflush(stdout);
 	}
-
-
 
 	return 0;
 }

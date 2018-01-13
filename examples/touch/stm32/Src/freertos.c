@@ -159,11 +159,7 @@ int measure(int axis) {
 		}
 	}
 
-	int current = samples[SAMPLES_NUM / 2];
-
-	curr[axis] = current;
-
-	return current;
+	return samples[SAMPLES_NUM / 2];
 }
 
 /* USER CODE END FunctionPrototypes */
@@ -235,7 +231,6 @@ void touchTask(void const * argument)
 
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
-	int X, Y;
 	// precent
 	int was_touched = 0;
 	for(;;) {
@@ -255,7 +250,7 @@ void touchTask(void const * argument)
 		digitalWrite(XP, GPIO_PIN_SET);
 		digitalWrite(XM, GPIO_PIN_RESET);
 
-		Y = measure(AXIS_Y);
+		curr[AXIS_Y] = measure(AXIS_Y);
 
 		// ================== X AXIS ================
 		pinMode(XP, GPIO_MODE_ANALOG);
@@ -271,8 +266,7 @@ void touchTask(void const * argument)
 		digitalWrite(YP, GPIO_PIN_SET);
 		digitalWrite(YM, GPIO_PIN_RESET);
 
-		X = measure(AXIS_X);
-
+		curr[AXIS_X] = measure(AXIS_X);
 
 
 		// Set X+ to ground
@@ -295,8 +289,13 @@ void touchTask(void const * argument)
 
 
 		if(pressure > 0) {
-			snprintf(printBuffer, sizeof(printBuffer), "X=%d Y=%d XP=%d XY=%d %d\n\r", X, Y, calcPercent(X, AXIS_X),
-			         calcPercent(Y, AXIS_Y), pressure);
+			snprintf(printBuffer, sizeof(printBuffer), "X=%d Y=%d XP=%d XY=%d %d\n\r",
+			         curr[AXIS_X],
+			         curr[AXIS_Y],
+			         calcPercent(curr[AXIS_X], AXIS_X),
+			         calcPercent(curr[AXIS_Y], AXIS_Y),
+			         pressure
+			);
 			HAL_UART_Transmit(&huart1, printBuffer, strlen(printBuffer), HAL_MAX_DELAY);
 		}
 
@@ -332,17 +331,19 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 			uint8_t mode = (rx[0] & 0x70) >> 4;
 			send_irq = (rx[0] & 0x3) == 0;
 
-			tx[0] = tx[1] = 0;
-			if(mode == 0b001) {
-				tx[0] = (curr[AXIS_Y] >> 8) & 0xFFFF;
-				tx[1] = curr[AXIS_Y] & 0xF;
-			} else if(mode == 0b101) {
-				tx[0] = (curr[AXIS_X] >> 8) & 0xFFFF;
-				tx[1] = curr[AXIS_X] & 0xF;
-			} else if(mode == 0b100 || mode == 0b011) {
+			if(mode == ADS_MEASURE_Y) {
+				int val = curr[AXIS_Y] >> 1;
+
+				tx[0] = (val >> 4) & 0xFF;
+				tx[1] = (val & 0xF) << 4;
+			} else if(mode == ADS_MEASURE_X) {
+				int val = curr[AXIS_X] >> 1;
+				tx[0] = (val >> 4) & 0xFF;
+				tx[1] = (val & 0xF) << 4;
+			} else if(mode == ADS_MEASURE_Z2 || mode == ADS_MEASURE_Z1) {
 				int pressure = 32000;
 
-				tx[0] = (pressure >> 8) & 0xFFFF;
+				tx[0] = (pressure >> 8) & 0xFF;
 				tx[1] = pressure & 0xF;
 			} else {
 				// TODO: wat?
