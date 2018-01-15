@@ -60,8 +60,22 @@
 osThreadId defaultTaskHandle;
 
 /* USER CODE BEGIN Variables */
-uint8_t rx[2];
-uint8_t tx[2];
+#define BUF_MAX 32
+
+union {
+	uint8_t bytes[BUF_MAX];
+	struct {
+		uint8_t cmd;
+		uint32_t nums[(BUF_MAX + sizeof(uint32_t))/ sizeof(uint32_t)];
+	} __attribute__((packed));
+} rx;
+
+union {
+	uint8_t bytes[BUF_MAX];
+	uint32_t nums[(BUF_MAX + sizeof(uint32_t))/ sizeof(uint32_t)];
+} tx;
+
+
 int dir;
 int pos = 0;
 
@@ -69,6 +83,14 @@ uint8_t ram[255];
 
 #define DIR_READ 0
 #define DIR_WRITE 1
+
+#define CMD_READ 0x10
+#define CMD_SET 0x11
+#define CMD_ADD 0x12
+#define CMD_SUB 0x13
+#define CMD_AND 0x14
+#define CMD_OR 0x15
+uint32_t result = 0;
 
 
 /* USER CODE END Variables */
@@ -134,13 +156,36 @@ void StartDefaultTask(void const * argument)
 /* USER CODE BEGIN Application */
 void start_over() {
 	pos = 0;
-	rx[0] = rx[1] = 0;
-	tx[0] = tx[1] = 0;
+	for(int i = 0; i < 18; i++) {
+		rx.bytes[i] = 0;
+		tx.bytes[i] = 0;
+	}
 	configASSERT(HAL_I2C_EnableListen_IT(&hi2c1) == HAL_OK);
 }
 
 void process() {
-	ram[rx[0]] = rx[1];
+	switch(rx.cmd) {
+		case CMD_SET:
+			result = rx.nums[0];
+			break;
+		case CMD_ADD:
+			result += rx.nums[0];
+			break;
+		case CMD_SUB:
+			result -= rx.nums[0];
+			break;
+		case CMD_AND:
+			result &= rx.nums[0];
+			break;
+		case CMD_OR:
+			result |= rx.nums[0];
+			break;
+
+		case CMD_READ:
+			break;
+		//default:
+			//asm("bkpt #1");
+	}
 }
 
 void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
@@ -152,19 +197,21 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 
 	// increment
 	pos++;
-	configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx + pos, 1, I2C_LAST_FRAME) == HAL_OK);
+	configASSERT(pos < BUF_MAX);
+
+	configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx.bytes + pos, 1, I2C_LAST_FRAME) == HAL_OK);
 }
 
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
 	dir = TransferDirection;
 	pos = 0;
 	if(TransferDirection == I2C_DIRECTION_TRANSMIT) {
-		configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx + pos, 1, I2C_FIRST_FRAME) == HAL_OK);
+		configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx.bytes + pos, 1, I2C_FIRST_FRAME) == HAL_OK);
 	} else if(TransferDirection == I2C_DIRECTION_RECEIVE) {
-		tx[0] = ram[rx[0]];
+		tx.nums[0] = result;
 
 		hi2c->State = HAL_I2C_STATE_LISTEN;
-		configASSERT(HAL_I2C_Slave_Sequential_Transmit_IT(hi2c, tx, 1, I2C_FIRST_FRAME) == HAL_OK);
+		configASSERT(HAL_I2C_Slave_Sequential_Transmit_IT(hi2c, tx.bytes, sizeof(tx.nums[0]), I2C_FIRST_AND_LAST_FRAME) == HAL_OK);
 	} else {
 		asm("bkpt #1");
 	}
@@ -186,62 +233,6 @@ void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c) {
 	asm("bkpt #1");
 }
 
-
-
-
-/*
-void start_over() {
-	pos = 0;
-	configASSERT(HAL_I2C_EnableListen_IT(&hi2c1) == HAL_OK);
-}
-
-void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
-	// transmit done
-}
-
-void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
-	pos++;
-
-	if(pos == 1) {
-		ram[rx[0]] = rx[1];
-	}
-
-	configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx + pos, 1, I2C_LAST_FRAME) == HAL_OK);
-
-}
-
-void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
-	if(TransferDirection == I2C_DIRECTION_TRANSMIT) {
-		configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx, 1, I2C_FIRST_FRAME) == HAL_OK);
-	} else if(TransferDirection == I2C_DIRECTION_RECEIVE) {
-		tx[0]++;
-		int val = HAL_I2C_Slave_Sequential_Transmit_IT(hi2c, tx, 1, I2C_FIRST_AND_LAST_FRAME);
-		configASSERT(val == HAL_OK);
-	} else {
-		asm("bkpt #1");
-	}
-}
-
-void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c) {
-	pos = 0;
-	rx[0] = 0;
-	rx[1] = 0;
-	configASSERT(HAL_I2C_EnableListen_IT(&hi2c1) == HAL_OK);
-}
-
-void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
-	if(hi2c->ErrorCode != HAL_I2C_ERROR_AF) {
-		asm("bkpt #1");
-		start_over();
-	} else {
-		HAL_I2C_SlaveRxCpltCallback(hi2c);
-	}
-}
-
-void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c) {
-	asm("bkpt #1");
-}
- */
 /* USER CODE END Application */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
