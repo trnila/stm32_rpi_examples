@@ -65,6 +65,8 @@ uint8_t tx[2];
 int dir;
 int pos = 0;
 
+uint8_t ram[255];
+
 #define DIR_READ 0
 #define DIR_WRITE 1
 
@@ -132,10 +134,67 @@ void StartDefaultTask(void const * argument)
 /* USER CODE BEGIN Application */
 void start_over() {
 	pos = 0;
+	rx[0] = rx[1] = 0;
+	tx[0] = tx[1] = 0;
 	configASSERT(HAL_I2C_EnableListen_IT(&hi2c1) == HAL_OK);
 }
 
-char ret = 0;
+void process() {
+	ram[rx[0]] = rx[1];
+}
+
+void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	//asm("bkpt #1");
+}
+
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+	// process
+
+	// increment
+	pos++;
+	configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx + pos, 1, I2C_LAST_FRAME) == HAL_OK);
+}
+
+void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
+	dir = TransferDirection;
+	pos = 0;
+	if(TransferDirection == I2C_DIRECTION_TRANSMIT) {
+		configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx + pos, 1, I2C_FIRST_FRAME) == HAL_OK);
+	} else if(TransferDirection == I2C_DIRECTION_RECEIVE) {
+		tx[0] = ram[rx[0]];
+
+		hi2c->State = HAL_I2C_STATE_LISTEN;
+		configASSERT(HAL_I2C_Slave_Sequential_Transmit_IT(hi2c, tx, 1, I2C_FIRST_FRAME) == HAL_OK);
+	} else {
+		asm("bkpt #1");
+	}
+}
+
+void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c) {
+	start_over();
+}
+
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
+	if(dir == I2C_DIRECTION_TRANSMIT) {
+		process();
+	} else {
+		asm("bkpt #1");
+	}
+}
+
+void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c) {
+	asm("bkpt #1");
+}
+
+
+
+
+/*
+void start_over() {
+	pos = 0;
+	configASSERT(HAL_I2C_EnableListen_IT(&hi2c1) == HAL_OK);
+}
+
 void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
 	// transmit done
 }
@@ -143,22 +202,15 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
 	pos++;
 
-	//configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx, 1, I2C_LAST_FRAME) == HAL_OK);
-
-	/*
-
-	pos++;
-	if(pos == 2) {
-		return;
+	if(pos == 1) {
+		ram[rx[0]] = rx[1];
 	}
 
-	configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx + pos, 1, I2C_NEXT_FRAME) == HAL_OK);
-	 */
+	configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx + pos, 1, I2C_LAST_FRAME) == HAL_OK);
+
 }
 
 void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, uint16_t AddrMatchCode) {
-	pos = 0;
-
 	if(TransferDirection == I2C_DIRECTION_TRANSMIT) {
 		configASSERT(HAL_I2C_Slave_Sequential_Receive_IT(hi2c, rx, 1, I2C_FIRST_FRAME) == HAL_OK);
 	} else if(TransferDirection == I2C_DIRECTION_RECEIVE) {
@@ -171,22 +223,25 @@ void HAL_I2C_AddrCallback(I2C_HandleTypeDef *hi2c, uint8_t TransferDirection, ui
 }
 
 void HAL_I2C_ListenCpltCallback(I2C_HandleTypeDef *hi2c) {
+	pos = 0;
+	rx[0] = 0;
+	rx[1] = 0;
 	configASSERT(HAL_I2C_EnableListen_IT(&hi2c1) == HAL_OK);
 }
 
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
-	asm("bkpt #1");
 	if(hi2c->ErrorCode != HAL_I2C_ERROR_AF) {
-		//start_over();
-	} else {
 		asm("bkpt #1");
+		start_over();
+	} else {
+		HAL_I2C_SlaveRxCpltCallback(hi2c);
 	}
 }
 
 void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c) {
 	asm("bkpt #1");
 }
-     
+ */
 /* USER CODE END Application */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
