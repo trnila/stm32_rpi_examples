@@ -180,16 +180,7 @@ void process() {
 		case CMD_OR:
 			result |= rx.nums[0];
 			break;
-
-		case CMD_READ:
-			break;
-		//default:
-			//asm("bkpt #1");
 	}
-}
-
-void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
-	//asm("bkpt #1");
 }
 
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
