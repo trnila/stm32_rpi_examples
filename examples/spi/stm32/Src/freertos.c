@@ -97,6 +97,7 @@ Command current;
 State state;
 Number number;
 uint8_t nil[MAX_ARGS * sizeof(int)];
+uint8_t queueSize;
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -177,7 +178,9 @@ void spiTask(void const * argument)
 	Command cmd;
 
 	for(;;) {
-		configASSERT(xQueueReceive(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
+		configASSERT(xQueuePeek(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
+
+		HAL_Delay(2000);
 
 		for(int i = 0; i < cmd.argLen; i++) {
 			switch (cmd.cmd) {
@@ -202,6 +205,8 @@ void spiTask(void const * argument)
 					break;
 			}
 		}
+
+		configASSERT(xQueueReceive(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
 	}
   /* USER CODE END spiTask */
 }
@@ -209,7 +214,8 @@ void spiTask(void const * argument)
 /* USER CODE BEGIN Application */
 void start_over() {
 	state = STATE_START;
-	configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &nil, &current.cmd, 1) == HAL_OK);
+	queueSize = uxQueueMessagesWaitingFromISR(commandsHandle);
+	configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, &queueSize, &current.cmd, 1) == HAL_OK);
 }
 
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {

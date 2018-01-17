@@ -8,14 +8,20 @@ DEVICE = 1
 class SPIProtocol:
     def __init__(self, spi):
         self.spi = spi
+        self.retry_read = 50000
 
     def send(self, cmd, *args):
         data = list(itertools.chain(*[self._encode(i) for i in args]))
         self.spi.xfer([cmd, len(args)] + data)
 
     def recv(self, cmd):
-        rcv = self.spi.xfer([cmd, 0x00, 0x00, 0x00, 0x00])
-        return self._decode(rcv[1:])
+        for i in range(0, self.retry_read):
+            rcv = self.spi.xfer([cmd, 0x00, 0x00, 0x00, 0x00])
+
+            if rcv[0] == 0:
+                return self._decode(rcv[1:])
+
+            time.sleep(0.001)
 
     def _encode(self, num):
         return [
@@ -66,7 +72,7 @@ value = 100
 add = [1, 2, 3]
 
 calc.set(value)
-time.sleep(1)
+time.sleep(0.1)
 while True:
     calc.add(*add)
     value += sum(add)
