@@ -182,7 +182,7 @@ void spiTask(void const * argument)
 		for(int i = 0; i < cmd.argLen; i++) {
 			switch (cmd.cmd) {
 				case CMD_SET:
-					number.word = cmd.args[i].word;
+					number.word = cmd.args[0].word;
 					break;
 
 				case CMD_ADD:

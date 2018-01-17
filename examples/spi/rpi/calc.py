@@ -10,7 +10,6 @@ class SPIProtocol:
         self.spi = spi
 
     def send(self, cmd, *args):
-
         data = list(itertools.chain(*[self._encode(i) for i in args]))
         self.spi.xfer([cmd, len(args)] + data)
 
@@ -63,10 +62,20 @@ spi.max_speed_hz = 1000
 
 calc = Calculator(spi)
 
-calc.set(100)
+value = 100
+add = [1, 2, 3]
+
+calc.set(value)
+time.sleep(1)
 while True:
-    calc.add(5, 1, 4)
+    calc.add(*add)
+    value += sum(add)
+
     val = calc.read()
     print(val)
+
+    if val != value:
+        print("Expected {}, got {}".format(value, val))
+
     time.sleep(0.1)
 
