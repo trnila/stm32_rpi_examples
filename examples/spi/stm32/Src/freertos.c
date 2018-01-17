@@ -64,6 +64,9 @@ osMessageQId commandsHandle;
 /* USER CODE BEGIN Variables */
 extern uint8_t xSwitchRequired;
 
+#define IRQ_GPIO GPIOB
+#define IRQ_PIN GPIO_PIN_0
+
 #define MAX_ARGS 4
 
 typedef enum {
@@ -174,6 +177,8 @@ void StartDefaultTask(void const * argument)
 void spiTask(void const * argument)
 {
   /* USER CODE BEGIN spiTask */
+	HAL_GPIO_WritePin(IRQ_GPIO, IRQ_PIN, GPIO_PIN_RESET);
+
 	start_over();
 	Command cmd;
 
@@ -207,6 +212,9 @@ void spiTask(void const * argument)
 		}
 
 		configASSERT(xQueueReceive(commandsHandle, &cmd, portMAX_DELAY) == pdTRUE);
+		queueSize = uxQueueMessagesWaiting(commandsHandle);
+		HAL_GPIO_WritePin(IRQ_GPIO, IRQ_PIN, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(IRQ_GPIO, IRQ_PIN, GPIO_PIN_RESET);
 	}
   /* USER CODE END spiTask */
 }

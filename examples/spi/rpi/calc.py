@@ -1,14 +1,20 @@
 import spidev
 import time
 import itertools
+import RPi.GPIO as GPIO
 
 BUS = 0
 DEVICE = 1
+GPIO_IRQ = 21
 
 class SPIProtocol:
-    def __init__(self, spi):
+    def __init__(self, spi, gpio_irq):
         self.spi = spi
         self.retry_read = 50000
+        self.gpio_irq = gpio_irq
+
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.gpio_irq, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
     def send(self, cmd, *args):
         data = list(itertools.chain(*[self._encode(i) for i in args]))
@@ -17,11 +23,13 @@ class SPIProtocol:
     def recv(self, cmd):
         for i in range(0, self.retry_read):
             rcv = self.spi.xfer([cmd, 0x00, 0x00, 0x00, 0x00])
+            # TODO: at first transfer, there is not updated queue size?
+            rcv = self.spi.xfer([cmd, 0x00, 0x00, 0x00, 0x00])
 
             if rcv[0] == 0:
                 return self._decode(rcv[1:])
 
-            time.sleep(0.001)
+            GPIO.wait_for_edge(self.gpio_irq, GPIO.RISING)
 
     def _encode(self, num):
         return [
@@ -66,13 +74,12 @@ spi = spidev.SpiDev()
 spi.open(BUS, DEVICE)
 spi.max_speed_hz = 1000
 
-calc = Calculator(spi)
+calc = Calculator(spi, GPIO_IRQ)
 
 value = 100
 add = [1, 2, 3]
 
 calc.set(value)
-time.sleep(0.1)
 while True:
     calc.add(*add)
     value += sum(add)
