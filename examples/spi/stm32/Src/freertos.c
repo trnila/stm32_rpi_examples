@@ -226,7 +226,8 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 			configASSERT(HAL_SPI_TransmitReceive_IT(&hspi1, nil, &current.argLen, sizeof(current.argLen)) == HAL_OK);
 		}
 	} else if(state == STATE_READ) {
-		configASSERT(xQueueSendFromISR(commandsHandle, &current, &xSwitchRequired) == pdTRUE);
+		BaseType_t ret = xQueueSendFromISR(commandsHandle, &current, &xSwitchRequired);
+		configASSERT(ret == pdTRUE || ret == errQUEUE_FULL);
 		start_over();
 	} else if(state == STATE_ARGLEN) {
 		state = STATE_READ;
