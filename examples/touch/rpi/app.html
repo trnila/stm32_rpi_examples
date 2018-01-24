@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+    <canvas style="border: 1px solid black" width="300" height="600"></canvas>
+    <script type="text/javascript">
+        const host = document.location.host.split(':')[0];
+        const port = 3000;
+
+        const source = new EventSource("http://" + host + ":" + port);
+        const c = document.querySelector('canvas');
+        const ctx = c.getContext("2d");
+
+        c.width = window.innerWidth - 30;
+        c.height = window.innerHeight - 30;
+
+        var prevX = 0;
+        var prevY = 0;
+        source.onmessage = function(event) {
+            var match = /XP=(\d+)\s*XY=(\d+)/g.exec(event.data);
+            var X = match[1];
+            var Y = 100 - match[2];
+//            X = 100 - match[1];
+  //          Y = match[2];
+
+            var x = Y / 100 * c.width;
+            var y = X / 100 * c.height;
+
+
+            console.log(X, Y);
+            //ctx.beginPath();
+            //ctx.arc(x, y, 10, 0, 2 * Math.PI);
+            //ctx.stroke();
+            //return;
+
+			var t = 20;
+            if(Math.abs(prevX - x) > t || Math.abs(prevY - y) > t) {
+                prevX = x;
+				prevY = y;
+				return;
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(prevX,prevY);
+            ctx.lineTo(x,y);
+			ctx.lineWidth = 15;
+            ctx.stroke();
+            prevX = x;
+            prevY = y;
+        };
+    </script>
+</body>
+</html>
