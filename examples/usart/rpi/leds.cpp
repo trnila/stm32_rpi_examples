@@ -3,14 +3,11 @@
 #include <array>
 #include <vector>
 #include <mutex>
-#include "erpc_client_setup.h"
 #include "messages.h"
 #include "Scheduler.h"
+#include "setup.h"
 
 using namespace std::literals::chrono_literals;
-
-const char *SERIAL_PATH = "/dev/ttyAMA0";
-const int BAUD_RATE = 115200;
 
 std::mutex mutex;
 
@@ -49,9 +46,7 @@ private:
 };
 
 int main() {
-	erpc_transport_t transport = erpc_transport_serial_init(SERIAL_PATH, BAUD_RATE);
-	erpc_mbf_t message_buffer_factory = erpc_mbf_dynamic_init();
-	erpc_client_init(transport, message_buffer_factory);
+	erpc_setup();
 
 	std::vector<int> speeds = {100, 500, 250, 10000};
 

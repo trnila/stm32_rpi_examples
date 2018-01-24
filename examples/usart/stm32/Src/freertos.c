@@ -9,7 +9,7 @@
   * inserted by the user or by software development tools
   * are owned by their respective copyright owners.
   *
-  * Copyright (c) 2017 STMicroelectronics International N.V. 
+  * Copyright (c) 2018 STMicroelectronics International N.V. 
   * All rights reserved.
   *
   * Redistribution and use in source and binary forms, with or without 
@@ -106,7 +106,7 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
 
   /* definition and creation of uart */
-  osThreadDef(uart, uartTask, osPriorityIdle, 0, 128);
+  osThreadDef(uart, uartTask, osPriorityIdle, 0, 512);
   uartHandle = osThreadCreate(osThread(uart), NULL);
 
   /* definition and creation of ledCtrl */
@@ -139,10 +139,12 @@ void StartDefaultTask(void const * argument)
 /* uartTask function */
 void uartTask(void const * argument)
 {
+  /* USER CODE BEGIN uartTask */
     gpio_setup(1, 0x00);
 
 	erpc_server_init(erpc_transport_cmsis_uart_init(&huart1), erpc_mbf_static_init());
 	erpc_add_service_to_server(create_IO_service());
+	erpc_add_service_to_server(create_Calc_service());
 
 	for(;;) {
 		erpc_server_run();

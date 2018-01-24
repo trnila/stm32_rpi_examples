@@ -1,14 +1,19 @@
 OBJECTS=messages_client.o \
-	main.o \
-	erpc_setup_mbf_dynamic.o
+	erpc_setup_mbf_dynamic.o \
+	setup.o \
+	/usr/local/lib/liberpc.a
+
 
 CXXFLAGS=-I/usr/local/include/erpc/ -std=c++14
 LDFLAGS=-lpthread
 CC=g++
-TARGET=main
 
-$(TARGET): $(OBJECTS) /usr/local/lib/liberpc.a
+all: leds calc
+
+leds: $(OBJECTS) leds.o
+calc: $(OBJECTS) calc.o
+
 
 
 clean:
-	rm -f *.o $(TARGET)
+	rm -f *.o leds calc
