@@ -37,7 +37,7 @@
 #include "cmsis_os.h"
 
 /* USER CODE BEGIN 0 */
-
+int pxHigherPriorityTaskWoken;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -169,6 +169,8 @@ void USART1_IRQHandler(void)
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
+	portEND_SWITCHING_ISR(pxHigherPriorityTaskWoken);
+	pxHigherPriorityTaskWoken = 0;
 
   /* USER CODE END USART1_IRQn 1 */
 }

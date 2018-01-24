@@ -61,7 +61,7 @@ osThreadId defaultTaskHandle;
 osMessageQId problemsHandle;
 
 /* USER CODE BEGIN Variables */
-BaseType_t pxHigherPriorityTaskWoken;
+extern int pxHigherPriorityTaskWoken;
 
 typedef struct {
 	int start;
