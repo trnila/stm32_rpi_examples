@@ -70,7 +70,7 @@ extern int pxHigherPriorityTaskWoken;
 int computing = 0;
 
 uint8_t rxBuffer[BUFSIZE];
-uint8_t txBuffer[BUFSIZE] = {};
+uint8_t txBuffer[BUFSIZE];
 
 /* USER CODE END Variables */
 
@@ -140,7 +140,6 @@ void StartDefaultTask(void const * argument)
 		// read CRC and enable spi again
 		uint32_t crc = hcrc.Instance->DR;
 		*((uint32_t*) txBuffer) = crc;
-		computing = 0;
 		start_over();
 
 		// send usart interrupt to rapsberry pi
@@ -155,6 +154,9 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
 	if(computing == 0) {
 		computing = 1;
 		vTaskNotifyGiveFromISR(defaultTaskHandle, &pxHigherPriorityTaskWoken);
+	} else {
+		computing = 0;
+		start_over();
 	}
 }
 
