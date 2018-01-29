@@ -1,8 +1,9 @@
 #MicroXplorer Configuration settings - do not modify
 FREERTOS.FootprintOK=true
-FREERTOS.IPParameters=Tasks01,Queues01,FootprintOK
-FREERTOS.Queues01=problems,16,Block,NULL,Dynamic,NULL,NULL
+FREERTOS.IPParameters=Tasks01,Queues01,FootprintOK,configTOTAL_HEAP_SIZE
+FREERTOS.Queues01=problems,64,Problem,NULL,Dynamic,NULL,NULL
 FREERTOS.Tasks01=defaultTask,0,512,StartDefaultTask,Default,NULL,Dynamic,NULL,NULL
+FREERTOS.configTOTAL_HEAP_SIZE=16800
 File.Version=6
 KeepUserPlacement=false
 Mcu.Family=STM32F1

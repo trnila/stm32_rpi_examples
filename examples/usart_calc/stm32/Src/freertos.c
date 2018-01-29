@@ -61,17 +61,19 @@ osThreadId defaultTaskHandle;
 osMessageQId problemsHandle;
 
 /* USER CODE BEGIN Variables */
+#define PROBLEM_MAX_SIZE 20
+#define TXBUF_SIZE 100
+
 extern int pxHigherPriorityTaskWoken;
 
-typedef struct {
-	int start;
-	int stop;
-} Block ;
+typedef uint8_t Problem[PROBLEM_MAX_SIZE];
 
-uint8_t rxBuffer[128];
-Block current;
+uint8_t rxBuffer[PROBLEM_MAX_SIZE];
 int pos = 0;
-const char errorMsg[] = "ERROR\r\n";
+
+uint8_t txBuffer[TXBUF_SIZE];
+int txHead = 0;
+int txTail = 0;
 /* USER CODE END Variables */
 
 /* Function prototypes -------------------------------------------------------*/
@@ -80,7 +82,8 @@ void StartDefaultTask(void const * argument);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /* USER CODE BEGIN FunctionPrototypes */
-uint8_t shiftLetter(uint8_t c);
+void sendNext();
+void sendResponse(const char *msg, int size);
 /* USER CODE END FunctionPrototypes */
 
 /* Hook prototypes */
@@ -115,7 +118,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* definition and creation of problems */
-  osMessageQDef(problems, 16, Block);
+  osMessageQDef(problems, 64, Problem);
   problemsHandle = osMessageCreate(osMessageQ(problems), NULL);
 
   /* USER CODE BEGIN RTOS_QUEUES */
@@ -129,41 +132,70 @@ void StartDefaultTask(void const * argument)
 
   /* USER CODE BEGIN StartDefaultTask */
 	configASSERT(HAL_UART_Receive_IT(&huart1, rxBuffer, 1) == HAL_OK);
-	Block c;
+	Problem problem;
 	int a, b;
 	char op;
-	char resultBuffer[12];
+	char resultBuf[12];
 	for(;;) {
-		configASSERT(xQueueReceive(problemsHandle, &c, portMAX_DELAY) == pdTRUE);
+		configASSERT(xQueueReceive(problemsHandle, &problem, portMAX_DELAY) == pdTRUE);
 
-		int val = sscanf(rxBuffer, "%d %c %d", &a, &op, &b);
+		int val = sscanf(problem, "%d %c %d", &a, &op, &b);
 		if(val != 3) {
-			configASSERT(HAL_UART_Transmit(&huart1, errorMsg, sizeof(errorMsg), HAL_MAX_DELAY) == HAL_OK);
 			continue;
 		}
 
+		//osDelay(100);
+
 		int result = a + b;
-		snprintf(resultBuffer, sizeof(resultBuffer), "%d\n", result);
-		configASSERT(HAL_UART_Transmit(&huart1, resultBuffer, strlen(resultBuffer), HAL_MAX_DELAY) == HAL_OK);
+		snprintf(resultBuf, sizeof(resultBuf), "%d\n", result);
+		sendResponse(resultBuf, strlen(resultBuf));
 	}
   /* USER CODE END StartDefaultTask */
 }
 
 /* USER CODE BEGIN Application */
-
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if(rxBuffer[pos] == '\n') {
-		configASSERT(xQueueSendFromISR(problemsHandle, &current, &pxHigherPriorityTaskWoken) == pdTRUE);
+		configASSERT(xQueueSendFromISR(problemsHandle, rxBuffer, &pxHigherPriorityTaskWoken) == pdTRUE);
 		pos = 0;
 	} else {
 		pos++;
 	}
 
-	configASSERT(HAL_UART_Receive_IT(&huart1, rxBuffer + pos, 1) == HAL_OK);
+	int x = HAL_UART_Receive_IT(&huart1, rxBuffer + pos, 1);
+	configASSERT(x == HAL_OK);
 
 	if (pos >= sizeof(rxBuffer)) {
 		pos = 0;
 	}
+}
+
+void sendNext() {
+	configASSERT(HAL_UART_Transmit_IT(&huart1, txBuffer + txHead, 1) == HAL_OK);
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+	txHead = (txHead + 1) % TXBUF_SIZE;
+
+	if(txHead != txTail) {
+		sendNext();
+	}
+}
+
+void sendResponse(const char *msg, int size) {
+	portENTER_CRITICAL();
+	int notify = txHead == txTail;
+
+	for(int i = 0; i < size; i++) {
+		txBuffer[txTail] = msg[i];
+		txTail = (txTail + 1) % TXBUF_SIZE;
+	}
+
+	if(notify) {
+		sendNext();
+	}
+
+	portEXIT_CRITICAL();
 }
      
 /* USER CODE END Application */
