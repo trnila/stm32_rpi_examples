@@ -58,6 +58,7 @@
 
 /* Variables -----------------------------------------------------------------*/
 osThreadId defaultTaskHandle;
+osThreadId heartbeatTaskHandle;
 osMessageQId problemsHandle;
 
 /* USER CODE BEGIN Variables */
@@ -78,6 +79,7 @@ int txTail = 0;
 
 /* Function prototypes -------------------------------------------------------*/
 void StartDefaultTask(void const * argument);
+void heartbeat(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -111,6 +113,10 @@ void MX_FREERTOS_Init(void) {
   /* definition and creation of defaultTask */
   osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 512);
   defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+
+  /* definition and creation of heartbeatTask */
+  osThreadDef(heartbeatTask, heartbeat, osPriorityIdle, 0, 128);
+  heartbeatTaskHandle = osThreadCreate(osThread(heartbeatTask), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -151,6 +157,17 @@ void StartDefaultTask(void const * argument)
 		sendResponse(resultBuf, strlen(resultBuf));
 	}
   /* USER CODE END StartDefaultTask */
+}
+
+/* heartbeat function */
+void heartbeat(void const * argument)
+{
+  /* USER CODE BEGIN heartbeat */
+	for(;;) {
+		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_1);
+		osDelay(500);
+	}
+  /* USER CODE END heartbeat */
 }
 
 /* USER CODE BEGIN Application */
