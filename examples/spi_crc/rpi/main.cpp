@@ -220,6 +220,10 @@ int serial_open(const char* path, int speed) {
 	tty.c_cflag &= ~CSTOPB;
 	tty.c_cflag &= ~CRTSCTS;
 
+	// blocking read - wait for 1 byte indefinitely
+	tty.c_cc[VMIN] = 1;
+	tty.c_cc[VTIME] = 0;
+
 	if (tcsetattr(serialFd, TCSANOW, &tty) != 0) {
 		pabort("tcsetattr");
 	}
@@ -233,7 +237,7 @@ void wait_for_completion(int fd) {
 	printf("%c %d\n", c, c);
 }
 
-void checksum(int spiFd, int serialFd, uint8_t *data) {
+int checksum(int spiFd, int serialFd, uint8_t *data) {
 	uint8_t rx[BUFSIZE];
 
 	uint32_t crc = CRC::Calculate(data, BUFSIZE, CRC::CRC_32_MPEG2());
@@ -244,7 +248,10 @@ void checksum(int spiFd, int serialFd, uint8_t *data) {
 
 	uint32_t receivedCrc = ((uint32_t *) rx)[0];
 
-	printf("CRC %s: computed=%x received=%x\n", crc == receivedCrc ? "MATCH" : "INVALID", crc, receivedCrc);
+	int match = crc == receivedCrc;
+	printf("CRC %s: computed=%x received=%x\n", match ? "MATCH" : "INVALID", crc, receivedCrc);
+
+	return match;
 }
 
 int main(int argc, char *argv[]) {
@@ -304,7 +311,9 @@ int main(int argc, char *argv[]) {
 			buffer[i] = rand() % 255;
 		}
 
-		checksum(fd, serialFd, buffer);
+		if(!checksum(fd, serialFd, buffer)) {
+			ret = 1;
+		}
 	}
 
 	close(fd);
