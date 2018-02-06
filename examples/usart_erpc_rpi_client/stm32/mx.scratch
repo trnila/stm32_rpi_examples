@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Project>
-<ProjectName>/home/daniel/stm32_rpi_examples/examples/usart/stm32/\usart</ProjectName>
+<ProjectName>/home/daniel/stm32_rpi_examples/examples/usart_erpc_rpi_client/stm32/\usart</ProjectName>
 <CMSIS>../Drivers/CMSIS</CMSIS>
 <HAL_Driver>/home/daniel/STM32Cube/Repository//STM32Cube_FW_F1_V1.6.0/Drivers/CMSIS</HAL_Driver>
 

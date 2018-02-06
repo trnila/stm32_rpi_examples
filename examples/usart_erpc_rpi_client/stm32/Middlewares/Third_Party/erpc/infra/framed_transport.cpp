@@ -40,6 +40,12 @@ using namespace erpc;
 // Code
 ////////////////////////////////////////////////////////////////////////////////
 
+#define SIZE 64
+union {
+	FramedTransport::Header h;
+	uint8_t data[SIZE];
+} rcv;
+
 FramedTransport::FramedTransport()
 : Transport()
 , m_crcImpl(NULL)
@@ -63,26 +69,23 @@ void FramedTransport::setCrc16(Crc16 *crcImpl)
 erpc_status_t FramedTransport::receive(MessageBuffer *message)
 {
     assert(m_crcImpl && "Uninitialized Crc16 object.");
-    Header h;
+    Header &h = rcv.h;
 
     {
 #if ERPC_THREADS
         Mutex::Guard lock(m_receiveLock);
 #endif
 
-        // Receive header first.
-        erpc_status_t ret = underlyingReceive((uint8_t *)&h, sizeof(h));
+		erpc_status_t ret = underlyingReceive((uint8_t *)&rcv, SIZE);
         if (ret != kErpcStatus_Success)
         {
             return ret;
         }
-
-        // Receive rest of the message now we know its size.
-        ret = underlyingReceive(message->get(), h.m_messageSize);
-        if (ret != kErpcStatus_Success)
-        {
-            return ret;
-        }
+		ret = message->write(0, rcv.data + sizeof(Header), h.m_messageSize);
+		if (ret != kErpcStatus_Success)
+		{
+			return ret;
+		}
     }
 
     // Verify CRC.
@@ -116,5 +119,5 @@ erpc_status_t FramedTransport::send(MessageBuffer *message)
     }
 
     // Send the rest of the message.
-    return underlyingSend(message->get(), messageLength);
+    return underlyingSend(message->get(), SIZE - sizeof(h));
 }

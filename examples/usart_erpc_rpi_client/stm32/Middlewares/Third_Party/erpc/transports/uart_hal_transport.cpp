@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cassert>
+#include "cmsis_os.h"
 
 using namespace erpc;
 
@@ -9,12 +10,15 @@ using namespace erpc;
 // Variables
 ////////////////////////////////////////////////////////////////////////////////
 
-const int SIZE = 128;
-const int TIMEOUT = 5;
+const int SIZE = 64;
+const int TIMEOUT = 50;
 static uint8_t buffer[SIZE];
 static volatile uint32_t head;
 static volatile uint32_t tail;
 static UART_HandleTypeDef *huart;
+osThreadId thread;
+uint8_t *target;
+int size;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Code
@@ -24,7 +28,7 @@ UartHalTransport::UartHalTransport(UART_HandleTypeDef *uartDrv)
 : m_uartDrv(uartDrv)
 {
 	huart = uartDrv;
-	assert(HAL_UART_Receive_IT(huart, buffer, 1) == HAL_OK);
+	configASSERT(HAL_UART_Receive_DMA(huart, buffer, SIZE) == HAL_OK);
 }
 
 UartHalTransport::~UartHalTransport()
@@ -33,31 +37,28 @@ UartHalTransport::~UartHalTransport()
 
 /* Transfer callback */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *hspi) {
-	tail = (tail + 1) % SIZE;
-	HAL_UART_Receive_IT(huart, buffer + tail, 1);
 }
 
-erpc_status_t UartHalTransport::init()
-{
+void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart) {
+	for(int i = 0; i < size; i++) {
+		target[i] = buffer[i];
+	}
+
+	osThreadResume(thread);
+}
+
+erpc_status_t UartHalTransport::init() {
+	thread = osThreadGetId();
 	return kErpcStatus_Success;
 }
 
 erpc_status_t UartHalTransport::underlyingReceive(uint8_t *data, uint32_t size)
 {
-	int start;
-    for(uint32_t i = 0; i < size; i++) {
-    	while(head == tail) {
-    		if(i != 0 && HAL_GetTick() - start > TIMEOUT) {
-				return kErpcStatus_Timeout;
-			}
-    	}
-
-    	start = HAL_GetTick();
-
-    	data[i] = buffer[head];
-    	head = (head + 1) % SIZE;
-    }
-
+	target = data;
+	::size = size;
+	if(size > 0) {
+		osThreadSuspend(NULL);
+	}
     return kErpcStatus_Success;
 }
 

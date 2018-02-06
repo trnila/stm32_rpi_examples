@@ -4,6 +4,7 @@
 #include "setup.h"
 #include "messages.h"
 #include "Counter.h"
+#include <unistd.h>
 
 const int MAXNUM = 100;
 const int COUNT = 10;
@@ -51,7 +52,7 @@ int main() {
 
 	Counter cnt(5);
 
-	send_sum();
+	//send_sum();
 	for(;;) {
 		send_addition();
 		cnt.tick();

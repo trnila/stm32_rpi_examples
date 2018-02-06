@@ -4,6 +4,7 @@
 #include "framed_transport.h"
 #include <stdlib.h>
 #include "stm32f1xx_hal.h"
+#include "cmsis_os.h"
 
 /*!
  * @addtogroup uart_transport
