@@ -47,7 +47,7 @@ void send_addition() {
 
 
 int main() {
-	erpc_setup();
+	erpc_setup(SERIAL_PATH, 921600);
 	srand(time(NULL));
 
 	Counter cnt(5);
