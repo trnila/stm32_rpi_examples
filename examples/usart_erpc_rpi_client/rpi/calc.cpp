@@ -3,6 +3,7 @@
 #include <time.h>
 #include "setup.h"
 #include "messages.h"
+#include "Counter.h"
 
 const int MAXNUM = 100;
 const int COUNT = 10;
@@ -43,13 +44,17 @@ void send_addition() {
 	printf("[%s] %d + %d = %d\n", a + b == result ? "PASS" : "FAIL", a, b, result);
 }
 
+
 int main() {
 	erpc_setup();
 	srand(time(NULL));
 
+	Counter cnt(5);
+
 	send_sum();
 	for(;;) {
 		send_addition();
+		cnt.tick();
 	}
 
 	return 0;
