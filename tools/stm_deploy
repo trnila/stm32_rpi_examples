@@ -1,0 +1,20 @@
+#!/bin/sh
+
+while [ ! -d stm32 ]; do
+	cd ..
+
+	if [ "$(pwd)" = "/" ]; then
+		echo stm32 directory not found
+		exit 1
+	fi
+done
+
+if [ ! -d stm32/build ]; then
+	mkdir stm32/build
+fi
+
+cd stm32/build || exit 1
+
+cmake .. || exit 1
+make -j4 || exit 1 
+stm_flash *.bin || exit 1
