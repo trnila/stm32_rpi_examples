@@ -51,14 +51,16 @@
 #include "task.h"
 #include "cmsis_os.h"
 
-/* USER CODE BEGIN Includes */
+/* USER CODE BEGIN Includes */     
 #include "gpio_banks.h"
+#include "main.h"
 
 /* USER CODE END Includes */
 
 /* Variables -----------------------------------------------------------------*/
 osThreadId bank0Handle;
 osThreadId bank1Handle;
+osThreadId sendToRpiHandle;
 
 /* USER CODE BEGIN Variables */
 const int pin_mask = (1 << GPIO_BANKS_WIDE) - 1;
@@ -91,6 +93,7 @@ const GPIO_Bank banks[][GPIO_BANKS_WIDE] = {
 /* Function prototypes -------------------------------------------------------*/
 void bank0Task(void const * argument);
 void bank1Task(void const * argument);
+void sendToRpiTask(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -127,6 +130,10 @@ void MX_FREERTOS_Init(void) {
   /* definition and creation of bank1 */
   osThreadDef(bank1, bank1Task, osPriorityIdle, 0, 128);
   bank1Handle = osThreadCreate(osThread(bank1), NULL);
+
+  /* definition and creation of sendToRpi */
+  osThreadDef(sendToRpi, sendToRpiTask, osPriorityIdle, 0, 128);
+  sendToRpiHandle = osThreadCreate(osThread(sendToRpi), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -168,6 +175,17 @@ void bank1Task(void const * argument)
 		osDelay(100);
 	}
   /* USER CODE END bank1Task */
+}
+
+/* sendToRpiTask function */
+void sendToRpiTask(void const * argument)
+{
+  /* USER CODE BEGIN sendToRpiTask */
+  for(;;)  {
+	  osDelay(25);
+	  HAL_GPIO_TogglePin(toRpi_GPIO_Port, toRpi_Pin);
+  }
+  /* USER CODE END sendToRpiTask */
 }
 
 /* USER CODE BEGIN Application */
