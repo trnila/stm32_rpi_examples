@@ -189,7 +189,15 @@ void sendToRpiTask(void const * argument)
 }
 
 /* USER CODE BEGIN Application */
-     
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	if(GPIO_Pin == fromRpi_Pin) {
+		HAL_GPIO_TogglePin(toRpi_GPIO_Port, toRpi_Pin);
+	} else {
+		// unknown gpio interrupt
+		asm("bkpt #0");
+	}
+}
+
 /* USER CODE END Application */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

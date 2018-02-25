@@ -57,6 +57,9 @@
 
 /* Private define ------------------------------------------------------------*/
 
+#define fromRpi_Pin GPIO_PIN_10
+#define fromRpi_GPIO_Port GPIOB
+#define fromRpi_EXTI_IRQn EXTI15_10_IRQn
 #define toRpi_Pin GPIO_PIN_11
 #define toRpi_GPIO_Port GPIOB
 
