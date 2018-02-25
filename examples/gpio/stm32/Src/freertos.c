@@ -51,8 +51,7 @@
 #include "task.h"
 #include "cmsis_os.h"
 
-/* USER CODE BEGIN Includes */     
-#define GPIO_BANKS_WIDE 4
+/* USER CODE BEGIN Includes */
 #include "gpio_banks.h"
 
 /* USER CODE END Includes */
@@ -82,8 +81,8 @@ const GPIO_Bank banks[][GPIO_BANKS_WIDE] = {
 		{GPIOA, GPIO_PIN_15},
 		{GPIOA, GPIO_PIN_12},
 		{GPIOA, GPIO_PIN_11},
-		{GPIOB, GPIO_PIN_10},
-		{GPIOB, GPIO_PIN_11}
+		{GPIOA, GPIO_PIN_8},
+		{GPIOB, GPIO_PIN_15}
 	},
 };
 
