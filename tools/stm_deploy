@@ -9,12 +9,20 @@ while [ ! -d stm32 ]; do
 	fi
 done
 
-if [ ! -d stm32/build ]; then
-	mkdir stm32/build
+if [ "$1" = "clean" ]; then
+	rm -rf stm32/build
+elif [ ! -z "$1" ]; then
+	echo "Unknown parameter"
+	echo "Usage: $0 [clean]"
+else
+
+	if [ ! -d stm32/build ]; then
+		mkdir stm32/build
+	fi
+
+	cd stm32/build || exit 1
+
+	cmake .. || exit 1
+	make -j4 || exit 1 
+	stm_flash ./*.bin || exit 1
 fi
-
-cd stm32/build || exit 1
-
-cmake .. || exit 1
-make -j4 || exit 1 
-stm_flash *.bin || exit 1
