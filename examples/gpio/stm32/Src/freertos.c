@@ -47,6 +47,7 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
+#include <usart.h>
 #include "FreeRTOS.h"
 #include "task.h"
 #include "cmsis_os.h"
@@ -61,8 +62,11 @@
 osThreadId bank0Handle;
 osThreadId bank1Handle;
 osThreadId sendToRpiHandle;
+osThreadId ackFromRpiHandle;
 
 /* USER CODE BEGIN Variables */
+extern BaseType_t pxHigherPriorityTaskWoken;
+
 const int pin_mask = (1 << GPIO_BANKS_WIDE) - 1;
 
 const GPIO_Bank banks[][GPIO_BANKS_WIDE] = {
@@ -94,6 +98,7 @@ const GPIO_Bank banks[][GPIO_BANKS_WIDE] = {
 void bank0Task(void const * argument);
 void bank1Task(void const * argument);
 void sendToRpiTask(void const * argument);
+void ackFromRpiTask(void const * argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -134,6 +139,10 @@ void MX_FREERTOS_Init(void) {
   /* definition and creation of sendToRpi */
   osThreadDef(sendToRpi, sendToRpiTask, osPriorityIdle, 0, 128);
   sendToRpiHandle = osThreadCreate(osThread(sendToRpi), NULL);
+
+  /* definition and creation of ackFromRpi */
+  osThreadDef(ackFromRpi, ackFromRpiTask, osPriorityIdle, 0, 128);
+  ackFromRpiHandle = osThreadCreate(osThread(ackFromRpi), NULL);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -188,10 +197,22 @@ void sendToRpiTask(void const * argument)
   /* USER CODE END sendToRpiTask */
 }
 
+/* ackFromRpiTask function */
+void ackFromRpiTask(void const * argument)
+{
+  /* USER CODE BEGIN ackFromRpiTask */
+	char ack = 'A';
+	for(;;) {
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		HAL_UART_Transmit(&huart1, &ack, sizeof(ack), HAL_MAX_DELAY);
+	}
+  /* USER CODE END ackFromRpiTask */
+}
+
 /* USER CODE BEGIN Application */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if(GPIO_Pin == fromRpi_Pin) {
-		HAL_GPIO_TogglePin(toRpi_GPIO_Port, toRpi_Pin);
+		vTaskNotifyGiveFromISR(ackFromRpiHandle, &pxHigherPriorityTaskWoken);
 	} else {
 		// unknown gpio interrupt
 		asm("bkpt #0");

@@ -37,7 +37,7 @@
 #include "cmsis_os.h"
 
 /* USER CODE BEGIN 0 */
-
+BaseType_t pxHigherPriorityTaskWoken;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -164,10 +164,11 @@ void SysTick_Handler(void)
 void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
-
+	pxHigherPriorityTaskWoken = 0;
   /* USER CODE END EXTI15_10_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_10);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
+	portEND_SWITCHING_ISR(pxHigherPriorityTaskWoken);
 
   /* USER CODE END EXTI15_10_IRQn 1 */
 }
