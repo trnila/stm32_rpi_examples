@@ -14,7 +14,7 @@ source "${DIR}/source_ctrl"
 
 pin_set "$boot0_pin" 1
 reset
-python ~/stm32loader.py -p /dev/ttyAMA0 -e -w "$firmware"
+python "$DIR/stm32loader.py" -p /dev/ttyAMA0 -e -w "$firmware"
 pin_set "$boot0_pin" 0
 reset
 pin_dir "$reset_pin" in
